@@ -3,14 +3,21 @@
 Usage:
     python src/main.py
     python src/main.py --max-results-per-query 5 --max-total-posts 50
+
+Pipeline:
+    1. Firecrawl search → find Reddit post URLs
+    2. PullPush.io → fetch full post content + top comments
+    3. Extract signals (keywords, regex)
+    4. Score relevance (0-100)
+    5. Save to CSV
 """
 
 import argparse
 import csv
 import json
 import os
-import sys
 import time
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -18,10 +25,12 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 from firecrawl_client import search_reddit
+from pullpush_client import fetch_post_by_id, fetch_comments, extract_post_fields
 from extractor import extract_signals
 from scorer import calculate_relevance_score, determine_intent, build_why_relevant
 from utils import (
     extract_subreddit,
+    extract_post_id,
     clean_text,
     make_snippet,
     deduplicate_by_url,
@@ -31,6 +40,7 @@ from utils import (
 # --- Config ---
 DEFAULT_MAX_RESULTS_PER_QUERY = 10
 DEFAULT_MAX_TOTAL_POSTS = 100
+TOP_COMMENTS_COUNT = 10
 PRIORITY_SCORE_THRESHOLD = 70
 QUERIES_FILE = os.path.join(os.path.dirname(__file__), "..", "queries.json")
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
@@ -51,13 +61,24 @@ def load_queries() -> list[str]:
     return queries
 
 
-def process_post(url: str, query: str, search_title: str, description: str, markdown: str) -> dict:
-    """Process a single Reddit post from search results, extract signals, score.
+def format_utc_timestamp(ts) -> str:
+    """Convert a Unix timestamp to readable date string."""
+    if not ts:
+        return ""
+    try:
+        dt = datetime.fromtimestamp(int(ts), tz=timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M UTC")
+    except (ValueError, TypeError, OSError):
+        return str(ts)
 
-    Note: Firecrawl cannot scrape reddit.com directly.
-    We use title + description from search results as our text content.
-    If markdown is available (rare for Reddit), we use that too.
+
+def process_post(url: str, query: str, search_title: str, search_description: str) -> dict:
+    """Process a single Reddit post: fetch full content via PullPush, extract signals, score.
+
+    Falls back to Firecrawl search snippet if PullPush has no data.
     """
+    post_id = extract_post_id(url)
+
     row = {
         "query": query,
         "url": url,
@@ -71,22 +92,55 @@ def process_post(url: str, query: str, search_title: str, description: str, mark
         "scrape_error": "",
     }
 
-    # Build body from available content
-    title = clean_text(search_title)
-    # Use markdown if available, otherwise description from search
-    body_text = markdown if markdown else description
-    body = clean_text(body_text)
+    title = ""
+    body_parts = []
 
-    if not title and not body:
+    # Try PullPush for full content
+    if post_id:
+        post_data = fetch_post_by_id(post_id)
+
+        if post_data:
+            fields = extract_post_fields(post_data)
+            title = fields["title"]
+            selftext = fields["selftext"]
+
+            # Skip deleted/removed content markers
+            if selftext and selftext not in ("[deleted]", "[removed]"):
+                body_parts.append(selftext)
+
+            row["author_raw"] = fields["author"]
+            row["created_at_raw"] = format_utc_timestamp(fields["created_utc"])
+            row["subreddit"] = fields["subreddit"] or row["subreddit"]
+
+            # Fetch top comments for richer signal extraction
+            comments = fetch_comments(post_id, size=TOP_COMMENTS_COUNT)
+            for comment in comments:
+                comment_body = comment.get("body", "")
+                if comment_body and comment_body not in ("[deleted]", "[removed]"):
+                    body_parts.append(comment_body)
+
+            print(f"    PullPush: title + {len(body_parts)} text blocks")
+        else:
+            print(f"    PullPush: no data, using search snippet")
+
+    # Fallback to Firecrawl search data if PullPush returned nothing
+    if not title:
+        title = search_title
+    if not body_parts and search_description:
+        body_parts.append(search_description)
+
+    if not title and not body_parts:
         row["scraped_success"] = False
-        row["scrape_error"] = "no content returned from search"
+        row["scrape_error"] = "no content from PullPush or search"
 
-    row["title"] = title
+    # Build full body text
+    body = clean_text("\n\n".join(body_parts))
+    row["title"] = clean_text(title)
     row["body"] = body
     row["text_snippet"] = make_snippet(body)
 
-    # Extract signals from title + body
-    signals = extract_signals(title, body)
+    # Extract signals from title + full body (post text + comments)
+    signals = extract_signals(row["title"], body)
     row.update({
         "is_question": signals["is_question"],
         "mentions_parent_context": signals["mentions_parent_context"],
@@ -134,8 +188,8 @@ def main():
     queries = load_queries()
     print(f"\nLoaded {len(queries)} search queries from queries.json")
 
-    # Phase 1: Search for Reddit URLs
-    print("\n--- Phase 1: Searching for Reddit posts ---\n")
+    # Phase 1: Search for Reddit URLs via Firecrawl
+    print("\n--- Phase 1: Searching for Reddit posts (Firecrawl) ---\n")
     all_results = []
 
     for i, query in enumerate(queries, 1):
@@ -149,7 +203,6 @@ def main():
                 "query": query,
                 "title": r.get("title", ""),
                 "description": r.get("description", ""),
-                "markdown": r.get("markdown", ""),
             })
 
         # Small delay between searches
@@ -167,23 +220,22 @@ def main():
         print(f"Limiting to {args.max_total_posts} posts")
         unique_results = unique_results[:args.max_total_posts]
 
-    # Phase 2: Process each post
-    print(f"\n--- Phase 2: Processing {len(unique_results)} posts ---\n")
+    # Phase 2: Fetch full content via PullPush + extract signals
+    print(f"\n--- Phase 2: Fetching content & scoring ({len(unique_results)} posts via PullPush) ---\n")
     all_rows = []
 
     for i, item in enumerate(unique_results, 1):
-        print(f"[{i}/{len(unique_results)}] Processing: {item['url']}")
+        print(f"[{i}/{len(unique_results)}] {item['url']}")
         try:
             row = process_post(
                 url=item["url"],
                 query=item["query"],
                 search_title=item.get("title", ""),
-                description=item.get("description", ""),
-                markdown=item.get("markdown", ""),
+                search_description=item.get("description", ""),
             )
             all_rows.append(row)
         except Exception as e:
-            print(f"  [!] Error processing {item['url']}: {e}")
+            print(f"  [!] Error: {e}")
             all_rows.append({
                 "query": item["query"],
                 "url": item["url"],
@@ -219,7 +271,7 @@ def main():
     print(f"  Queries processed:     {len(queries)}")
     print(f"  URLs found (raw):      {len(all_results)}")
     print(f"  Unique posts:          {len(unique_results)}")
-    print(f"  With content:          {success_count}")
+    print(f"  With full content:     {success_count}")
     print(f"  High intent:           {high_count}")
     print(f"  Medium intent:         {medium_count}")
     print(f"  Priority posts:        {len(priority_rows)}")

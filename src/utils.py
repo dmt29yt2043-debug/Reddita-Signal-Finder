@@ -47,6 +47,15 @@ def extract_subreddit(url: str) -> str:
     return match.group(1) if match else ""
 
 
+def extract_post_id(url: str) -> str:
+    """Extract the Reddit post ID from a URL.
+
+    Example: /r/nycparents/comments/1ebd0g7/... -> 1ebd0g7
+    """
+    match = re.search(r'/comments/(\w+)', url)
+    return match.group(1) if match else ""
+
+
 def clean_text(text: str) -> str:
     """Clean scraped text: normalize whitespace, remove junk."""
     if not text:
