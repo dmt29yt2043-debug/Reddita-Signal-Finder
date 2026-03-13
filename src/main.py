@@ -10,6 +10,7 @@ Pipeline:
     3. Extract signals (keywords, regex)
     4. Score relevance (0-100)
     5. Save to CSV
+    6. Upload to Google Sheets
 """
 
 import argparse
@@ -178,6 +179,10 @@ def main():
                         default=DEFAULT_MAX_RESULTS_PER_QUERY)
     parser.add_argument("--max-total-posts", type=int,
                         default=DEFAULT_MAX_TOTAL_POSTS)
+    parser.add_argument("--no-sheets", action="store_true",
+                        help="Skip Google Sheets upload")
+    parser.add_argument("--share-email", type=str, default=None,
+                        help="Email to share Google Sheet with")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -278,6 +283,18 @@ def main():
     print(f"\n  All results:      {all_csv}")
     print(f"  Priority results: {priority_csv}")
     print("=" * 60)
+
+    # Phase 4: Upload to Google Sheets
+    if not args.no_sheets:
+        try:
+            from sheets_uploader import upload_results
+            sheet_url = upload_results(all_csv, priority_csv, share_email=args.share_email)
+            print(f"\n  Google Sheets: {sheet_url}")
+        except FileNotFoundError as e:
+            print(f"\n  [!] Sheets upload skipped: {e}")
+        except Exception as e:
+            print(f"\n  [!] Sheets upload failed: {e}")
+            print("  CSV files are still saved locally.")
 
 
 if __name__ == "__main__":
