@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Overview — NYC Kids Signal Finder{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+<p>Reddit & Quora posts where NYC parents look for kids activities — sorted by relevance.</p>
+
+<div class="counters">
+    <div class="counter-card">
+        <div class="number">{{ stats.new_signals or 0 }}</div>
+        <div class="label">New Signals</div>
+    </div>
+    <div class="counter-card">
+        <div class="number">{{ stats.monitoring or 0 }}</div>
+        <div class="label">Monitoring</div>
+    </div>
+    <div class="counter-card">
+        <div class="number">{{ stats.followup or 0 }}</div>
+        <div class="label">Needs Follow-up</div>
+    </div>
+    <div class="counter-card">
+        <div class="number">{{ stats.closed or 0 }}</div>
+        <div class="label">Closed</div>
+    </div>
+</div>
+
+<details>
+    <summary><strong>How it works</strong></summary>
+    <div style="padding: 1rem 0;">
+        <h4>1. Signal Discovery</h4>
+        <p>We search Reddit and Quora via Firecrawl (Google search API) for posts where NYC parents discuss kids activities. PullPush fetches full post text and comments.</p>
+
+        <h4>2. Signal Extraction</h4>
+        <p>Each post is analyzed for: parent context, child mentions, age, NYC location, activity type, and pain points (expensive, crowded, rainy day, etc.).</p>
+
+        <h4>3. Scoring</h4>
+        <p>Signals are scored 0-100. Posts scoring 70+ are marked as HOT — these are parents actively seeking help. 40-69 are WARM.</p>
+
+        <h4>4. Workflow</h4>
+        <p>Review signals → Draft a reply → Post on Reddit → Monitor for responses → Follow up → Close.</p>
+
+        <h4>5. Self-Learning</h4>
+        <p>Mark signals as "Not Fit" with a reason. After 2+ marks, a subreddit gets auto-penalized in future scoring.</p>
+    </div>
+</details>
+
+<div style="margin-top: 2rem;">
+    <h3>Quick Stats</h3>
+    <ul>
+        <li>Total signals in database: <strong>{{ stats.total or 0 }}</strong></li>
+        <li>High intent signals: <strong>{{ stats.high_intent or 0 }}</strong></li>
+    </ul>
+</div>
+{% endblock %}

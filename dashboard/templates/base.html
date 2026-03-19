@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}NYC Kids Signal Finder{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <h2>NYC Kids Signals</h2>
+        <nav>
+            <a href="/" class="{% if active == 'overview' %}active{% endif %}">
+                Overview
+            </a>
+            <a href="/signals" class="{% if active == 'signals' %}active{% endif %}">
+                New Signals
+                {% if nav.new_signals %}<span class="badge">{{ nav.new_signals }}</span>{% endif %}
+            </a>
+            <a href="/monitoring" class="{% if active == 'monitoring' %}active{% endif %}">
+                Monitoring
+                {% if nav.monitoring %}<span class="badge">{{ nav.monitoring }}</span>{% endif %}
+            </a>
+            <a href="/followup" class="{% if active == 'followup' %}active{% endif %}">
+                Follow-up
+                {% if nav.followup %}<span class="badge">{{ nav.followup }}</span>{% endif %}
+            </a>
+            <a href="/closed" class="{% if active == 'closed' %}active{% endif %}">
+                Closed
+            </a>
+            <a href="/learning" class="{% if active == 'learning' %}active{% endif %}">
+                Learning
+            </a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        {% if flash_message %}
+        <div class="flash flash-{{ flash_type|default('success') }}">
+            {{ flash_message }}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+
+        <footer style="margin-top: 3rem; color: #adb5bd; font-size: 0.8rem;">
+            NYC Kids Activities Signal Finder — internal tool
+        </footer>
+    </main>
+</body>
+</html>

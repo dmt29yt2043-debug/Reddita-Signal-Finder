@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}New Signals — NYC Kids Signal Finder{% endblock %}
+
+{% block content %}
+<h1>New Signals</h1>
+<p>Reddit posts where NYC parents discuss kids activities — sorted by relevance score.</p>
+
+<div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+    <span>Sort by:</span>
+    <a href="/signals?sort=score" class="btn {% if sort == 'score' %}btn-primary{% endif %}">Score</a>
+    <a href="/signals?sort=date" class="btn {% if sort == 'date' %}btn-primary{% endif %}">Date</a>
+    <a href="/signals?sort=subreddit" class="btn {% if sort == 'subreddit' %}btn-primary{% endif %}">Subreddit</a>
+    <span style="margin-left: auto;">Showing {{ signals|length }} signals</span>
+</div>
+
+{% for s in signals %}
+<div class="signal-card {% if s.relevance_score >= 70 %}hot{% elif s.relevance_score >= 40 %}warm{% else %}cold{% endif %}">
+    <div class="meta">
+        <span class="tag tag-subreddit">r/{{ s.subreddit or 'unknown' }}</span>
+
+        {% if s.mentions_parent_context %}
+        <span class="tag tag-parent">parent</span>
+        {% endif %}
+
+        {% if s.is_question %}
+        <span class="tag tag-question">question</span>
+        {% endif %}
+
+        {% if s.location_signal %}
+        <span class="tag tag-location">{{ s.location_signal[:20] }}</span>
+        {% endif %}
+
+        {% if s.activity_type_signal %}
+        <span class="tag tag-activity">{{ s.activity_type_signal[:20] }}</span>
+        {% endif %}
+
+        {% if s.child_age_signal %}
+        <span class="tag tag-age">{{ s.child_age_signal[:15] }}</span>
+        {% endif %}
+
+        {% if s.relevance_score >= 70 %}
+        <span class="urgency urgency-hot">HOT</span>
+        {% elif s.relevance_score >= 40 %}
+        <span class="urgency urgency-warm">WARM</span>
+        {% else %}
+        <span class="urgency urgency-cold">COLD</span>
+        {% endif %}
+
+        <span class="fit-score">Fit: {{ s.relevance_score }}%</span>
+        {% if s.created_at_raw %}
+        <span style="color: #6c757d; font-size: 0.85rem;">&middot; {{ s.created_at_raw[:10] }}</span>
+        {% endif %}
+    </div>
+
+    <h3><a href="/signals/{{ s.id }}">{{ s.title or '(no title)' }}</a></h3>
+
+    {% if s.text_snippet %}
+    <div class="snippet">{{ s.text_snippet[:200] }}{% if s.text_snippet|length > 200 %}...{% endif %}</div>
+    {% endif %}
+
+    {% if s.why_relevant %}
+    <div class="rationale">{{ s.why_relevant }}</div>
+    {% endif %}
+
+    <div class="actions">
+        <a href="{{ s.url }}" target="_blank" class="btn">Open Reddit &#x2197;</a>
+        <a href="/signals/{{ s.id }}" class="btn btn-primary">View Details</a>
+        <form method="post" action="/signals/{{ s.id }}/skip" style="display:inline;">
+            <button type="submit" class="btn">Skip</button>
+        </form>
+        <form method="post" action="/signals/{{ s.id }}/not-fit" class="not-fit-form">
+            <select name="reason" onchange="this.form.submit()">
+                <option value="" disabled selected>&#x2716; Not Fit</option>
+                <option value="wrong_subreddit">Wrong subreddit</option>
+                <option value="not_parent_kid">Not parent/kid related</option>
+                <option value="no_nyc">No NYC context</option>
+                <option value="spam">Spam / noise</option>
+                <option value="too_old">Too old</option>
+                <option value="other">Other</option>
+            </select>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+{% if not signals %}
+<div style="text-align: center; padding: 3rem; color: #6c757d;">
+    <p>No new signals. Run the pipeline to discover more!</p>
+    <code>python src/main.py</code>
+</div>
+{% endif %}
+{% endblock %}

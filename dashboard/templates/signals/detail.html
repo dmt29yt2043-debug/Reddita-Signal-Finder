@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Signal #{{ signal.id }} — NYC Kids Signal Finder{% endblock %}
+
+{% block content %}
+<a href="/signals" style="text-decoration: none; color: var(--brand-color);">&larr; Back to Signals</a>
+
+<h1 style="margin-top: 0.5rem;">Signal #{{ signal.id }}</h1>
+<p style="color: #6c757d;">r/{{ signal.subreddit or 'unknown' }}</p>
+
+<article style="margin: 1rem 0;">
+    <div class="meta" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem;">
+        {% if signal.relevance_score >= 70 %}
+        <span class="urgency urgency-hot">HOT</span>
+        {% elif signal.relevance_score >= 40 %}
+        <span class="urgency urgency-warm">WARM</span>
+        {% else %}
+        <span class="urgency urgency-cold">COLD</span>
+        {% endif %}
+
+        <strong>Fit: {{ signal.relevance_score }}%</strong>
+
+        {% if signal.created_at_raw %}
+        <span style="color: #6c757d;">&middot; {{ signal.created_at_raw }}</span>
+        {% endif %}
+
+        <a href="{{ signal.url }}" target="_blank" style="margin-left: auto;">Open Reddit &#x2197;</a>
+    </div>
+
+    <h2 style="margin: 0.5rem 0;">{{ signal.title or '(no title)' }}</h2>
+
+    {% if signal.author_raw %}
+    <p style="color: #6c757d; font-size: 0.85rem;">by u/{{ signal.author_raw }}</p>
+    {% endif %}
+
+    {% if signal.body %}
+    <div class="post-body">{{ signal.body[:2000] }}</div>
+    {% endif %}
+
+    <!-- Signal breakdown -->
+    <h3>Signal Breakdown</h3>
+    <div class="signal-breakdown">
+        <div class="item">
+            <span class="{% if signal.mentions_parent_context %}check{% else %}cross{% endif %}">
+                {% if signal.mentions_parent_context %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Parent context (+20)
+        </div>
+        <div class="item">
+            <span class="{% if signal.is_question %}check{% else %}cross{% endif %}">
+                {% if signal.is_question %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Question (+15)
+        </div>
+        <div class="item">
+            <span class="{% if signal.mentions_child %}check{% else %}cross{% endif %}">
+                {% if signal.mentions_child %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Mentions child (+15)
+        </div>
+        <div class="item">
+            <span class="{% if signal.location_signal %}check{% else %}cross{% endif %}">
+                {% if signal.location_signal %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            NYC location (+15): {{ signal.location_signal or '—' }}
+        </div>
+        <div class="item">
+            <span class="{% if signal.child_age_signal %}check{% else %}cross{% endif %}">
+                {% if signal.child_age_signal %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Child age (+10): {{ signal.child_age_signal or '—' }}
+        </div>
+        <div class="item">
+            <span class="{% if signal.activity_type_signal %}check{% else %}cross{% endif %}">
+                {% if signal.activity_type_signal %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Activity type (+10): {{ signal.activity_type_signal or '—' }}
+        </div>
+        <div class="item">
+            <span class="{% if signal.pain_signal %}check{% else %}cross{% endif %}">
+                {% if signal.pain_signal %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Pain signal (+10): {{ signal.pain_signal or '—' }}
+        </div>
+        <div class="item">
+            <span class="{% if signal.body %}check{% else %}cross{% endif %}">
+                {% if signal.body %}&#x2713;{% else %}&#x2717;{% endif %}
+            </span>
+            Has body text (+5)
+        </div>
+    </div>
+
+    {% if signal.why_relevant %}
+    <p><strong>Rationale:</strong> {{ signal.why_relevant }}</p>
+    {% endif %}
+</article>
+
+<!-- Draft Replies -->
+<h2>Draft Responses</h2>
+
+{% if drafts %}
+    {% for d in drafts %}
+    <div class="draft-card">
+        <h4>{{ d.reply_type|replace('_', ' ')|title }}</h4>
+        <div class="text">{{ d.reply_text }}</div>
+        <div class="copy-hint">Copy and adapt before posting</div>
+    </div>
+    {% endfor %}
+{% else %}
+    <p style="color: #6c757d;">No drafts generated yet.</p>
+    <form method="post" action="/signals/{{ signal.id }}/generate-drafts">
+        <button type="submit" class="btn btn-primary">Generate AI Drafts</button>
+    </form>
+{% endif %}
+
+<!-- Mark as Replied -->
+<h2 style="margin-top: 2rem;">Mark as Replied</h2>
+<form method="post" action="/signals/{{ signal.id }}/mark-replied" class="reply-form">
+    <label for="reply_text">My comment (paste what you posted):</label>
+    <textarea name="reply_text" id="reply_text" placeholder="Paste your Reddit reply here..."></textarea>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+        <div>
+            <label for="comment_id">Comment ID (optional):</label>
+            <input type="text" name="comment_id" id="comment_id" placeholder="e.g. k5x2abc">
+        </div>
+        <div>
+            <label for="comment_url">Comment URL (optional):</label>
+            <input type="text" name="comment_url" id="comment_url" placeholder="https://reddit.com/...">
+        </div>
+    </div>
+
+    <button type="submit" class="btn-check" style="margin-top: 1rem;">
+        &#x2705; Mark Replied &rarr; Move to Monitoring
+    </button>
+</form>
+
+<!-- Good Fit / Not Fit -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+    <form method="post" action="/signals/{{ signal.id }}/good-fit">
+        <button type="submit" class="btn btn-success" style="width: 100%; padding: 0.75rem;">
+            &#x1F44D; Good Fit
+        </button>
+    </form>
+    <form method="post" action="/signals/{{ signal.id }}/skip">
+        <button type="submit" class="btn" style="width: 100%; padding: 0.75rem;">Skip</button>
+    </form>
+</div>
+
+<div style="margin-top: 1rem;">
+    <h4>&#x2716; Mark as Not Fit <span style="font-weight:normal; color: #6c757d;">(helps the system learn)</span></h4>
+    <form method="post" action="/signals/{{ signal.id }}/not-fit" style="display: flex; gap: 0.5rem;">
+        <select name="reason">
+            <option value="wrong_subreddit">Wrong subreddit — not relevant community</option>
+            <option value="not_parent_kid">Not parent/kid related</option>
+            <option value="no_nyc">No NYC context</option>
+            <option value="spam">Spam / noise</option>
+            <option value="too_old">Too old</option>
+            <option value="other">Other</option>
+        </select>
+        <button type="submit" class="btn btn-danger">Mark Not Fit &amp; Learn</button>
+    </form>
+</div>
+{% endblock %}

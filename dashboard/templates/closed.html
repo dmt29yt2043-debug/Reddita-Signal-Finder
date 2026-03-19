@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Closed — NYC Kids Signal Finder{% endblock %}
+
+{% block content %}
+<h1>Closed</h1>
+<p>Archive of processed signals.</p>
+
+{% if signals %}
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Subreddit</th>
+            <th>Title</th>
+            <th>Score</th>
+            <th>Reason</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in signals %}
+        <tr>
+            <td><span class="tag tag-subreddit">r/{{ s.subreddit or '?' }}</span></td>
+            <td><a href="/signals/{{ s.id }}">{{ s.title[:60] }}{% if s.title|length > 60 %}...{% endif %}</a></td>
+            <td>{{ s.relevance_score }}%</td>
+            <td>
+                {% if s.closed_reason == 'not_fit' %}
+                    &#x2716; Not Fit ({{ s.not_fit_reason or 'unknown' }})
+                {% elif s.closed_reason == 'skip' %}
+                    Skipped
+                {% elif s.closed_reason == 'completed' %}
+                    &#x2705; Completed
+                {% elif s.closed_reason == 'no_response' %}
+                    No response
+                {% elif s.closed_reason == 'dead_thread' %}
+                    Dead thread
+                {% else %}
+                    {{ s.closed_reason or '—' }}
+                {% endif %}
+            </td>
+            <td style="font-size: 0.85rem; color: #6c757d;">{{ (s.status_changed_at or '')[:10] }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="text-align: center; padding: 3rem; color: #6c757d;">
+    No closed signals yet.
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Monitoring — NYC Kids Signal Finder{% endblock %}
+
+{% block content %}
+<h1>Monitoring</h1>
+<p>Active engagement cases — threads where you've posted a reply and are waiting for a response.</p>
+
+<form method="post" action="/monitoring/check">
+    <button type="submit" class="btn-check">&#x1F50D; Run Check — scan all monitored threads for new replies</button>
+</form>
+
+{% for c in cases %}
+<div class="case-card">
+    <div class="meta" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem;">
+        <span class="tag tag-subreddit">r/{{ c.subreddit or 'unknown' }}</span>
+
+        {% if c.new_replies_count > 0 %}
+        <span class="new-replies-badge">&#x1F514; {{ c.new_replies_count }} new replies</span>
+        {% endif %}
+
+        {% if c.last_checked_at %}
+        <span style="color: #6c757d; font-size: 0.85rem; margin-left: auto;">
+            Checked: {{ c.last_checked_at[:16] }}
+        </span>
+        {% endif %}
+    </div>
+
+    <h3><a href="/signals/{{ c.signal_id }}" style="color: #1d3557; text-decoration: none;">
+        {{ c.title or '(no title)' }}
+    </a></h3>
+
+    {% if c.reply_text %}
+    <p class="my-reply"><strong>My reply:</strong> {{ c.reply_text[:200] }}{% if c.reply_text|length > 200 %}...{% endif %}</p>
+    {% endif %}
+
+    <div class="actions" style="margin-top: 0.75rem;">
+        <a href="{{ c.url }}" target="_blank" class="btn">Open Reddit &#x2197;</a>
+        <a href="/signals/{{ c.signal_id }}" class="btn">Details</a>
+        <form method="post" action="/monitoring/{{ c.id }}/close" style="display:inline;">
+            <input type="hidden" name="reason" value="no_response">
+            <button type="submit" class="btn">Close</button>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+{% if not cases %}
+<div style="text-align: center; padding: 3rem; color: #6c757d;">
+    No active monitoring cases. Reply to a signal to start monitoring.
+</div>
+{% endif %}
+{% endblock %}

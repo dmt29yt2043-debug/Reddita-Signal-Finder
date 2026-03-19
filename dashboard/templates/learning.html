@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Learning — NYC Kids Signal Finder{% endblock %}
+
+{% block content %}
+<h1>Learning</h1>
+<p>Patterns learned from your feedback. Subreddits with 2+ "not fit" marks get auto-penalized in future scoring.</p>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+    <!-- Bad subreddits -->
+    <div>
+        <h3>&#x2716; Penalized Subreddits</h3>
+        {% for s in bad_subs %}
+        <div class="pattern-card {% if s.count >= 2 %}blocked{% endif %}">
+            <span>r/{{ s.subreddit }}</span>
+            <span class="hits">
+                {{ s.count }} marks
+                {% if s.count >= 2 %} — <span style="color: var(--hot-color);">AUTO-BLOCKED</span>{% endif %}
+            </span>
+        </div>
+        {% endfor %}
+        {% if not bad_subs %}
+        <p style="color: #6c757d;">No bad subreddits yet. Mark signals as "Not Fit" to teach the system.</p>
+        {% endif %}
+    </div>
+
+    <!-- Good subreddits -->
+    <div>
+        <h3>&#x1F44D; Good Subreddits</h3>
+        {% for s in good_subs %}
+        <div class="pattern-card">
+            <span>r/{{ s.subreddit }}</span>
+            <span class="hits" style="color: var(--success-color);">{{ s.count }} good fits</span>
+        </div>
+        {% endfor %}
+        {% if not good_subs %}
+        <p style="color: #6c757d;">No good subreddits yet. Mark signals as "Good Fit" to teach the system.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% if feedback_stats %}
+<h3 style="margin-top: 2rem;">Feedback Summary</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Reason</th>
+            <th>Count</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for f in feedback_stats %}
+        <tr>
+            <td>{{ f.feedback_type }}</td>
+            <td>{{ f.reason or '—' }}</td>
+            <td>{{ f.count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+{% if patterns %}
+<h3 style="margin-top: 2rem;">All Learned Patterns</h3>
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Value</th>
+            <th>Hits</th>
+            <th>Action</th>
+            <th>Threshold</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in patterns %}
+        <tr>
+            <td>{{ p.pattern_type }}</td>
+            <td>{{ p.value }}</td>
+            <td>{{ p.hit_count }}</td>
+            <td>{{ p.action }}</td>
+            <td>{{ p.threshold }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}

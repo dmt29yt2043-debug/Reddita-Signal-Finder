@@ -1,0 +1,3 @@
+kids.srv1362562.hstgr.cloud {
+    reverse_proxy web:8000
+}
